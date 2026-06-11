@@ -123,6 +123,39 @@ export const chatbotAnswers = [
   },
 ];
 
+export function getChatbotAnswer(question: string) {
+  const normalizedQuestion = normalizeText(question);
+
+  const rules = [
+    {
+      terms: ["entrega", "tarda", "tiempo", "demora", "horas"],
+      answer: chatbotAnswers[0].answer,
+    },
+    {
+      terms: ["organico", "organicos", "certificado", "natural", "productos"],
+      answer: chatbotAnswers[1].answer,
+    },
+    {
+      terms: ["pago", "pagos", "qr", "transferencia", "tarjeta", "contra entrega"],
+      answer: chatbotAnswers[2].answer,
+    },
+    {
+      terms: ["donde", "zona", "entregan", "cochabamba", "ubicacion"],
+      answer: chatbotAnswers[3].answer,
+    },
+    {
+      terms: ["whatsapp", "telefono", "pedir", "pedido"],
+      answer: chatbotAnswers[4].answer,
+    },
+  ];
+
+  const matchedRule = rules.find((rule) =>
+    rule.terms.some((term) => normalizedQuestion.includes(term)),
+  );
+
+  return matchedRule?.answer;
+}
+
 export function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -144,12 +177,18 @@ export function searchProducts(query: string, source: Product[] = products) {
     energia: ["cafe", "frutos secos", "miel"],
     eco: ["jabon", "detergente", "biodegradable"],
     natural: ["miel", "infusion", "frutos secos", "te"],
+    limpieza: ["detergente", "jabon", "biodegradable", "eco"],
+    dulce: ["miel", "chocolate", "panela"],
+    proteina: ["quinua", "harina", "frutos secos", "granola"],
   };
 
-  const expandedTerms = new Set<string>([
-    normalizedQuery,
-    ...(semanticMap[normalizedQuery] ?? []),
-  ]);
+  const expandedTerms = new Set<string>([normalizedQuery]);
+
+  Object.entries(semanticMap).forEach(([term, relatedTerms]) => {
+    if (normalizedQuery.includes(term) || term.includes(normalizedQuery)) {
+      relatedTerms.forEach((relatedTerm) => expandedTerms.add(relatedTerm));
+    }
+  });
 
   return source.filter((product) => {
     const searchableText = normalizeText(
@@ -169,11 +208,11 @@ export function searchProducts(query: string, source: Product[] = products) {
   });
 }
 
-export function getProductById(productId: string) {
-  return products.find((product) => product.id === productId);
+export function getProductById(productId: string, source: Product[] = products) {
+  return source.find((product) => product.id === productId);
 }
 
-export function getRecommendations(productId: string) {
+export function getRecommendations(productId: string, source: Product[] = products) {
   const recommendationMap: Record<string, string[]> = {
     "cafe-premium": ["chocolate-artesanal", "panela", "granola"],
     "miel-organica": ["te-coca", "manzanilla", "granola"],
@@ -189,7 +228,7 @@ export function getRecommendations(productId: string) {
   ];
 
   return ids
-    .map((id) => products.find((product) => product.id === id))
+    .map((id) => source.find((product) => product.id === id))
     .filter((product): product is Product => Boolean(product));
 }
 
@@ -201,9 +240,9 @@ export function formatUsdApprox(valueBs: number) {
   return `$us ${(valueBs / 6.96).toFixed(2)}`;
 }
 
-export function getCartSubtotal(lines: CartLine[]) {
+export function getCartSubtotal(lines: CartLine[], source: Product[] = products) {
   return lines.reduce((total, line) => {
-    const product = getProductById(line.productId);
+    const product = getProductById(line.productId, source);
     return total + (product ? product.priceBs * line.quantity : 0);
   }, 0);
 }

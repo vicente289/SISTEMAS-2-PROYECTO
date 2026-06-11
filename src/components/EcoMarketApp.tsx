@@ -10,6 +10,7 @@ import {
   formatUsdApprox,
   getAllOrders,
   getCartSubtotal,
+  getChatbotAnswer,
   getProductById,
   getRecommendations,
   getShipping,
@@ -24,6 +25,7 @@ import type {
   CartLine,
   CustomerData,
   Order,
+  OrderStatus,
   PaymentMethod,
   Product,
 } from "@/types";
@@ -48,11 +50,13 @@ type ChatMessage = {
 export default function EcoMarketApp() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Todos");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [customer, setCustomer] = useState<CustomerData>(emptyCustomer);
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("QR");
@@ -60,6 +64,7 @@ export default function EcoMarketApp() {
   const [trackingCode, setTrackingCode] = useState("ECO-DEMO-2026");
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterDone, setNewsletterDone] = useState(false);
+  const [newsletterCount, setNewsletterCount] = useState(0);
   const [reminderSent, setReminderSent] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -73,6 +78,7 @@ export default function EcoMarketApp() {
     const savedCart = window.localStorage.getItem(cartStorageKey);
     const savedOrders = window.localStorage.getItem(ordersStorageKey);
     const savedStock = window.localStorage.getItem(stockStorageKey);
+    const savedNewsletterCount = window.localStorage.getItem("ecomarket-newsletter-count");
 
     if (savedCart) {
       setCart(JSON.parse(savedCart) as CartLine[]);
@@ -91,11 +97,21 @@ export default function EcoMarketApp() {
         })),
       );
     }
+
+    if (savedNewsletterCount) {
+      setNewsletterCount(Number(savedNewsletterCount));
+    }
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(cartStorageKey, JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    if (!cart.length) {
+      setReminderSent(false);
+    }
+  }, [cart.length]);
 
   useEffect(() => {
     window.localStorage.setItem(ordersStorageKey, JSON.stringify(orders));
@@ -108,12 +124,50 @@ export default function EcoMarketApp() {
     window.localStorage.setItem(stockStorageKey, JSON.stringify(stockById));
   }, [products]);
 
-  const visibleProducts = useMemo(
+  useEffect(() => {
+    setCart((current) => {
+      const next = current
+        .map((line) => {
+          const product = products.find((item) => item.id === line.productId);
+
+          if (!product || product.stock <= 0) {
+            return null;
+          }
+
+          return {
+            ...line,
+            quantity: Math.min(line.quantity, product.stock),
+          };
+        })
+        .filter((line): line is CartLine => Boolean(line));
+
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [products]);
+
+  useEffect(() => {
+    window.localStorage.setItem("ecomarket-newsletter-count", String(newsletterCount));
+  }, [newsletterCount]);
+
+  const categories = useMemo(
+    () => ["Todos", ...Array.from(new Set(products.map((product) => product.category)))],
+    [products],
+  );
+
+  const searchedProducts = useMemo(
     () => searchProducts(query, products),
     [products, query],
   );
 
-  const subtotal = useMemo(() => getCartSubtotal(cart), [cart]);
+  const visibleProducts = useMemo(
+    () =>
+      activeCategory === "Todos"
+        ? searchedProducts
+        : searchedProducts.filter((product) => product.category === activeCategory),
+    [activeCategory, searchedProducts],
+  );
+
+  const subtotal = useMemo(() => getCartSubtotal(cart, products), [cart, products]);
   const shipping = getShipping(subtotal);
   const total = subtotal + shipping;
   const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
@@ -121,13 +175,33 @@ export default function EcoMarketApp() {
   const trackedOrder = allOrders.find(
     (order) => normalizeText(order.id) === normalizeText(trackingCode),
   );
+  const selectedProductView = selectedProduct
+    ? products.find((product) => product.id === selectedProduct.id) ?? selectedProduct
+    : null;
   const lowStockProducts = products.filter((product) => product.stock <= 12);
-  const mostSold = ["Café boliviano premium", "Miel orgánica", "Quinua real"];
+  const mostSold = useMemo(() => {
+    const salesByProduct = new Map<string, number>();
+
+    allOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        salesByProduct.set(
+          item.productId,
+          (salesByProduct.get(item.productId) ?? 0) + item.quantity,
+        );
+      });
+    });
+
+    return [...salesByProduct.entries()]
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 3)
+      .map(([productId]) => getProductById(productId, products)?.name)
+      .filter((name): name is string => Boolean(name));
+  }, [allOrders, products]);
 
   function addToCart(productId: string) {
-    const product = getProductById(productId);
+    const product = getProductById(productId, products);
 
-    if (!product) {
+    if (!product || product.stock <= 0) {
       return;
     }
 
@@ -148,7 +222,7 @@ export default function EcoMarketApp() {
   }
 
   function changeQuantity(productId: string, quantity: number) {
-    const product = getProductById(productId);
+    const product = getProductById(productId, products);
 
     if (!product) {
       return;
@@ -170,8 +244,24 @@ export default function EcoMarketApp() {
 
   function confirmOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCheckoutError("");
 
     if (!cart.length) {
+      return;
+    }
+
+    const invalidLine = cart.find((line) => {
+      const product = getProductById(line.productId, products);
+      return !product || product.stock < line.quantity;
+    });
+
+    if (invalidLine) {
+      const product = getProductById(invalidLine.productId, products);
+      setCheckoutError(
+        product
+          ? `Stock insuficiente para ${product.name}. Ajusta la cantidad antes de confirmar.`
+          : "Uno de los productos del carrito ya no está disponible.",
+      );
       return;
     }
 
@@ -179,7 +269,7 @@ export default function EcoMarketApp() {
       id: makeOrderId(),
       customer,
       paymentMethod,
-      items: cart,
+      items: cart.map((line) => ({ ...line })),
       subtotal,
       shipping,
       total,
@@ -206,6 +296,38 @@ export default function EcoMarketApp() {
     setIsCartOpen(false);
   }
 
+  function updateOrderStatus(orderId: string, status: Order["status"]) {
+    const existingOrder = allOrders.find((order) => order.id === orderId);
+
+    if (!existingOrder) {
+      return;
+    }
+
+    setOrders((current) => {
+      const existsInSavedOrders = current.some((order) => order.id === orderId);
+
+      if (existsInSavedOrders) {
+        return current.map((order) =>
+          order.id === orderId ? { ...order, status } : order,
+        );
+      }
+
+      return [{ ...existingOrder, status }, ...current];
+    });
+  }
+
+  function advanceTrackedOrder() {
+    if (!trackedOrder) {
+      return;
+    }
+
+    const currentIndex = orderStatuses.findIndex(
+      (status) => status === trackedOrder.status,
+    );
+    const nextStatus = orderStatuses[Math.min(currentIndex + 1, orderStatuses.length - 1)];
+    updateOrderStatus(trackedOrder.id, nextStatus);
+  }
+
   function sendChat(question: string) {
     const cleanedQuestion = question.trim();
 
@@ -213,13 +335,7 @@ export default function EcoMarketApp() {
       return;
     }
 
-    const answer =
-      chatbotAnswers.find((item) =>
-        normalizeText(cleanedQuestion).includes(normalizeText(item.question).slice(0, 12)),
-      ) ??
-      chatbotAnswers.find((item) =>
-        normalizeText(item.question).includes(normalizeText(cleanedQuestion)),
-      );
+    const answer = getChatbotAnswer(cleanedQuestion);
 
     setChatMessages((current) => [
       ...current,
@@ -227,7 +343,7 @@ export default function EcoMarketApp() {
       {
         role: "bot",
         text:
-          answer?.answer ??
+          answer ??
           "Puedo ayudarte con entregas, métodos de pago, productos orgánicos y atención por WhatsApp.",
       },
     ]);
@@ -301,6 +417,11 @@ export default function EcoMarketApp() {
             title="Catálogo de productos orgánicos y ecológicos"
             text="La tienda muestra stock, origen, precio, trazabilidad y compra directa para familias de Cochabamba."
           />
+          <CategoryFilter
+            categories={categories}
+            activeCategory={activeCategory}
+            onChange={setActiveCategory}
+          />
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visibleProducts.map((product) => (
               <ProductCard
@@ -311,6 +432,14 @@ export default function EcoMarketApp() {
               />
             ))}
           </div>
+          {!visibleProducts.length && (
+            <div className="mt-8 border border-earth-300 bg-white p-6 text-center shadow-soft">
+              <h3 className="text-xl font-black">No encontramos productos con ese filtro</h3>
+              <p className="mt-2 text-leaf-700">
+                Prueba con miel, cafe, saludable, limpieza, desayuno o cambia de categoria.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -331,7 +460,7 @@ export default function EcoMarketApp() {
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {["cafe-premium", "miel-organica", "quinua-real"].map((id) => {
-                  const product = getProductById(id);
+                  const product = getProductById(id, products);
                   return (
                     <button
                       key={id}
@@ -445,6 +574,13 @@ export default function EcoMarketApp() {
                   <p>
                     <strong>Total:</strong> {formatBs(trackedOrder.total)}
                   </p>
+                  <button
+                    onClick={advanceTrackedOrder}
+                    disabled={trackedOrder.status === "Entregado"}
+                    className="mt-3 w-full bg-leaf-600 px-4 py-3 font-black text-white transition hover:bg-leaf-700 disabled:bg-stone-400"
+                  >
+                    Avanzar estado logístico
+                  </button>
                 </div>
               ) : (
                 <p className="mt-5 text-sm text-earth-700">
@@ -528,10 +664,13 @@ export default function EcoMarketApp() {
             lowStockProducts={lowStockProducts}
             mostSold={mostSold}
             cartCount={cartCount}
+            onOrderStatusChange={updateOrderStatus}
             onStockChange={(productId, stock) =>
               setProducts((current) =>
                 current.map((product) =>
-                  product.id === productId ? { ...product, stock } : product,
+                  product.id === productId
+                    ? { ...product, stock: Math.max(0, Number.isFinite(stock) ? stock : 0) }
+                    : product,
                 ),
               )
             }
@@ -552,6 +691,7 @@ export default function EcoMarketApp() {
               onSubmit={(event) => {
                 event.preventDefault();
                 setNewsletterDone(true);
+                setNewsletterCount((count) => count + 1);
                 setNewsletterEmail("");
               }}
             >
@@ -572,6 +712,9 @@ export default function EcoMarketApp() {
                 Te enviaremos ofertas saludables cada 15 días.
               </p>
             )}
+            <p className="mt-2 text-sm text-leaf-700">
+              Suscripciones simuladas registradas: {newsletterCount}
+            </p>
           </div>
           <div>
             <SectionHeader
@@ -602,11 +745,12 @@ export default function EcoMarketApp() {
         WhatsApp
       </a>
 
-      {selectedProduct && (
+      {selectedProductView && (
         <ProductModal
-          product={selectedProduct}
+          product={selectedProductView}
+          products={products}
           onClose={() => setSelectedProduct(null)}
-          onAdd={() => addToCart(selectedProduct.id)}
+          onAdd={() => addToCart(selectedProductView.id)}
           onOpenRecommendation={setSelectedProduct}
         />
       )}
@@ -614,12 +758,14 @@ export default function EcoMarketApp() {
       {isCartOpen && (
         <CartDrawer
           cart={cart}
+          products={products}
           subtotal={subtotal}
           shipping={shipping}
           total={total}
           onClose={() => setIsCartOpen(false)}
           onQuantityChange={changeQuantity}
           onCheckout={() => {
+            setCheckoutError("");
             setIsCheckoutOpen(true);
             setIsCartOpen(false);
           }}
@@ -629,9 +775,11 @@ export default function EcoMarketApp() {
       {isCheckoutOpen && (
         <CheckoutModal
           cart={cart}
+          products={products}
           subtotal={subtotal}
           shipping={shipping}
           total={total}
+          checkoutError={checkoutError}
           customer={customer}
           paymentMethod={paymentMethod}
           setCustomer={setCustomer}
@@ -662,6 +810,15 @@ function Navbar({
   cartCount: number;
   onCartOpen: () => void;
 }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const links = [
+    ["#inicio", "Inicio"],
+    ["#productos", "Productos"],
+    ["#ia", "IA EcoMarket"],
+    ["#seguimiento", "Seguimiento"],
+    ["#admin", "Panel Admin"],
+  ];
+
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-white/20 bg-leaf-900/92 px-4 text-white backdrop-blur">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 py-4">
@@ -669,13 +826,19 @@ function Navbar({
           EcoMarket Bolivia
         </a>
         <div className="hidden items-center gap-5 text-sm font-bold lg:flex">
-          <a href="#inicio" className="hover:text-earth-300">Inicio</a>
-          <a href="#productos" className="hover:text-earth-300">Productos</a>
-          <a href="#ia" className="hover:text-earth-300">IA EcoMarket</a>
-          <a href="#seguimiento" className="hover:text-earth-300">Seguimiento</a>
-          <a href="#admin" className="hover:text-earth-300">Panel Admin</a>
+          {links.map(([href, label]) => (
+            <a key={href} href={href} className="hover:text-earth-300">
+              {label}
+            </a>
+          ))}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMenuOpen((value) => !value)}
+            className="border border-white/30 px-3 py-2 text-sm font-bold transition hover:bg-white/10 lg:hidden"
+          >
+            Menú
+          </button>
           <a
             href="https://wa.me/59170000000?text=Hola%2C%20quiero%20hacer%20un%20pedido%20en%20EcoMarket%20Bolivia."
             target="_blank"
@@ -692,6 +855,28 @@ function Navbar({
           </button>
         </div>
       </nav>
+      {isMenuOpen && (
+        <div className="mx-auto grid max-w-7xl gap-2 pb-4 text-sm font-bold lg:hidden">
+          {links.map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              onClick={() => setIsMenuOpen(false)}
+              className="border border-white/15 bg-white/10 px-3 py-2"
+            >
+              {label}
+            </a>
+          ))}
+          <a
+            href="https://wa.me/59170000000?text=Hola%2C%20quiero%20hacer%20un%20pedido%20en%20EcoMarket%20Bolivia."
+            target="_blank"
+            rel="noreferrer"
+            className="border border-white/15 bg-white/10 px-3 py-2"
+          >
+            Atención inmediata
+          </a>
+        </div>
+      )}
     </header>
   );
 }
@@ -755,6 +940,34 @@ function SmartSearch({
       <p className="mt-2 text-sm text-leaf-700">
         {resultCount} resultado(s) encontrados con coincidencia semántica.
       </p>
+    </div>
+  );
+}
+
+function CategoryFilter({
+  categories,
+  activeCategory,
+  onChange,
+}: {
+  categories: string[];
+  activeCategory: string;
+  onChange: (category: string) => void;
+}) {
+  return (
+    <div className="mt-8 flex gap-2 overflow-x-auto pb-2">
+      {categories.map((category) => (
+        <button
+          key={category}
+          onClick={() => onChange(category)}
+          className={`whitespace-nowrap border px-4 py-2 text-sm font-bold transition ${
+            activeCategory === category
+              ? "border-leaf-600 bg-leaf-600 text-white"
+              : "border-earth-300 bg-white text-leaf-900 hover:border-leaf-600"
+          }`}
+        >
+          {category}
+        </button>
+      ))}
     </div>
   );
 }
@@ -828,16 +1041,18 @@ function ProductCard({
 
 function ProductModal({
   product,
+  products,
   onClose,
   onAdd,
   onOpenRecommendation,
 }: {
   product: Product;
+  products: Product[];
   onClose: () => void;
   onAdd: () => void;
   onOpenRecommendation: (product: Product) => void;
 }) {
-  const recommendations = getRecommendations(product.id);
+  const recommendations = getRecommendations(product.id, products);
   const qrCells = makeQrCells(product.id);
 
   return (
@@ -908,9 +1123,10 @@ function ProductModal({
             </div>
             <button
               onClick={onAdd}
-              className="mt-6 w-full bg-leaf-600 px-5 py-3 font-black text-white transition hover:bg-leaf-700"
+              disabled={product.stock <= 0}
+              className="mt-6 w-full bg-leaf-600 px-5 py-3 font-black text-white transition hover:bg-leaf-700 disabled:bg-stone-400"
             >
-              Agregar al carrito
+              {product.stock > 0 ? "Agregar al carrito" : "Sin stock disponible"}
             </button>
             <div className="mt-6">
               <h4 className="font-black">Productos recomendados por IA</h4>
@@ -945,6 +1161,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 
 function CartDrawer({
   cart,
+  products,
   subtotal,
   shipping,
   total,
@@ -953,6 +1170,7 @@ function CartDrawer({
   onCheckout,
 }: {
   cart: CartLine[];
+  products: Product[];
   subtotal: number;
   shipping: number;
   total: number;
@@ -973,7 +1191,7 @@ function CartDrawer({
           {cart.length ? (
             <div className="space-y-4">
               {cart.map((line) => {
-                const product = getProductById(line.productId);
+                const product = getProductById(line.productId, products);
 
                 if (!product) {
                   return null;
@@ -995,7 +1213,8 @@ function CartDrawer({
                         <span className="w-8 text-center font-black">{line.quantity}</span>
                         <button
                           onClick={() => onQuantityChange(product.id, line.quantity + 1)}
-                          className="h-8 w-8 border border-earth-300 font-black"
+                          disabled={line.quantity >= product.stock}
+                          className="h-8 w-8 border border-earth-300 font-black disabled:bg-stone-200 disabled:text-stone-500"
                         >
                           +
                         </button>
@@ -1054,9 +1273,11 @@ function SummaryLine({
 
 function CheckoutModal({
   cart,
+  products,
   subtotal,
   shipping,
   total,
+  checkoutError,
   customer,
   paymentMethod,
   setCustomer,
@@ -1065,9 +1286,11 @@ function CheckoutModal({
   onConfirm,
 }: {
   cart: CartLine[];
+  products: Product[];
   subtotal: number;
   shipping: number;
   total: number;
+  checkoutError: string;
   customer: CustomerData;
   paymentMethod: PaymentMethod;
   setCustomer: (customer: CustomerData) => void;
@@ -1150,7 +1373,7 @@ function CheckoutModal({
             <h3 className="text-xl font-black">Resumen del pedido</h3>
             <div className="mt-4 space-y-3">
               {cart.map((line) => {
-                const product = getProductById(line.productId);
+                const product = getProductById(line.productId, products);
 
                 if (!product) {
                   return null;
@@ -1169,6 +1392,11 @@ function CheckoutModal({
               <SummaryLine label="Envío" value={formatBs(shipping)} />
               <SummaryLine label="Total" value={formatBs(total)} strong />
             </div>
+            {checkoutError && (
+              <p className="mt-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                {checkoutError}
+              </p>
+            )}
             <button className="mt-5 w-full bg-leaf-600 px-5 py-3 font-black text-white transition hover:bg-leaf-700">
               Confirmar pedido
             </button>
@@ -1281,7 +1509,7 @@ function Chatbot({
         ))}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {chatbotAnswers.slice(0, 3).map((item) => (
+        {chatbotAnswers.map((item) => (
           <button
             key={item.question}
             onClick={() => onSend(item.question)}
@@ -1318,6 +1546,7 @@ function AdminPanel({
   lowStockProducts,
   mostSold,
   cartCount,
+  onOrderStatusChange,
   onStockChange,
 }: {
   products: Product[];
@@ -1325,9 +1554,14 @@ function AdminPanel({
   lowStockProducts: Product[];
   mostSold: string[];
   cartCount: number;
+  onOrderStatusChange: (orderId: string, status: OrderStatus) => void;
   onStockChange: (productId: string, stock: number) => void;
 }) {
   const sales = orders.reduce((total, order) => total + order.total, 0);
+  const statusCounts = orderStatuses.map((status) => ({
+    status,
+    count: orders.filter((order) => order.status === status).length,
+  }));
 
   return (
     <div className="mt-8">
@@ -1338,6 +1572,15 @@ function AdminPanel({
         <AdminMetric label="Más vendidos" value={String(mostSold.length)} />
         <AdminMetric label="Clientes registrados" value={String(Math.max(orders.length, 8))} />
         <AdminMetric label="Carritos abandonados" value={cartCount ? "1" : "0"} />
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {statusCounts.map((item) => (
+          <div key={item.status} className="border border-earth-300 bg-white p-4 shadow-soft">
+            <p className="text-sm font-black">{item.status}</p>
+            <p className="mt-2 text-2xl font-black text-tech-700">{item.count}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1392,7 +1635,21 @@ function AdminPanel({
                     <td className="py-3 font-black">{order.id}</td>
                     <td className="py-3">{order.customer.name}</td>
                     <td className="py-3">{order.paymentMethod}</td>
-                    <td className="py-3">{order.status}</td>
+                    <td className="py-3">
+                      <select
+                        value={order.status}
+                        onChange={(event) =>
+                          onOrderStatusChange(order.id, event.target.value as OrderStatus)
+                        }
+                        className="w-full border border-earth-300 bg-white px-2 py-2 outline-none focus:focus-ring"
+                      >
+                        {orderStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-3 text-right font-bold">{formatBs(order.total)}</td>
                   </tr>
                 ))}

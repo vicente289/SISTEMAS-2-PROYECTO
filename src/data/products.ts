@@ -71,8 +71,7 @@ export const products: Product[] = [
     benefits: ["Alta en proteína", "Sin gluten", "Versátil para almuerzos"],
     producer: "Productores de Quinua Real Andina",
     delivery: "Entrega estimada en 8 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1615485925600-97237c4fc1ec?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:quinua",
     keywords: ["quinua", "quinoa", "cereal", "proteina", "saludable", "andino", "organico"],
     demandLevel: "Alta",
     demandPercent: 92,
@@ -147,8 +146,7 @@ export const products: Product[] = [
     benefits: ["Lista para servir", "Con semillas", "Buen complemento de yogur"],
     producer: "Cocina Natural Cercado",
     delivery: "Entrega estimada en 4 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1517093157656-b9eccef91cb1?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:granola",
     keywords: ["granola", "desayuno", "avena", "saludable", "quinua", "frutos secos"],
     demandLevel: "Alta",
     demandPercent: 76,
@@ -166,8 +164,7 @@ export const products: Product[] = [
     benefits: ["Sin gluten", "Alta en proteína", "Buena para repostería"],
     producer: "Molinos Andinos",
     delivery: "Entrega estimada en 8 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1606914501449-5a96b6ce24ca?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:harina-quinua",
     keywords: ["harina", "quinua", "quinoa", "pan", "saludable", "cereal"],
     demandLevel: "Media",
     demandPercent: 58,
@@ -185,8 +182,7 @@ export const products: Product[] = [
     benefits: ["Endulzante de caña", "Sin refinado industrial", "Buen maridaje con café"],
     producer: "Dulce Caña Bolivia",
     delivery: "Entrega estimada en 7 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:panela",
     keywords: ["panela", "azucar", "endulzante", "cafe", "natural", "organico"],
     demandLevel: "Media",
     demandPercent: 66,
@@ -204,8 +200,7 @@ export const products: Product[] = [
     benefits: ["Empaque ecológico", "Ingredientes naturales", "Apto para uso diario"],
     producer: "BioCuidado Bolivia",
     delivery: "Entrega estimada en 6 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1607006483224-16b8064a6e11?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:jabon",
     keywords: ["jabon", "jabón", "ecologico", "eco", "cuidado", "natural", "higiene"],
     demandLevel: "Baja",
     demandPercent: 34,
@@ -223,8 +218,7 @@ export const products: Product[] = [
     benefits: ["Biodegradable", "Uso familiar", "Reduce impacto ambiental"],
     producer: "Limpieza Verde SRL",
     delivery: "Entrega estimada en 7 horas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1585421514738-01798e348b17?auto=format&fit=crop&w=900&q=80",
+    imageUrl: "placeholder:detergente",
     keywords: ["detergente", "biodegradable", "limpieza", "eco", "hogar", "ecologico"],
     demandLevel: "Baja",
     demandPercent: 41,
@@ -251,6 +245,6 @@ export const mockOrders: Order[] = [
     total: 161,
     status: "En camino",
     createdAt: "2026-06-11T09:00:00.000Z",
-    estimatedTime: "Entrega menor a 8 horas",
+    estimatedTime: "Entrega en menos de 8 horas",
   },
 ];

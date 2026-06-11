@@ -275,7 +275,7 @@ export default function EcoMarketApp() {
       total,
       status: "Pedido recibido",
       createdAt: new Date().toISOString(),
-      estimatedTime: "Entrega menor a 8 horas",
+      estimatedTime: "Entrega en menos de 8 horas",
     };
 
     setOrders((current) => [newOrder, ...current]);
@@ -386,8 +386,8 @@ export default function EcoMarketApp() {
 
           <div className="grid max-w-md grid-cols-2 gap-3 text-sm font-semibold">
             {[
-              "Producto orgánico certificado",
-              "Entrega menor a 8 horas",
+              "Productos orgánicos certificados",
+              "Entrega en menos de 8 horas",
               "Pago seguro",
               "Apoyo a productores nacionales",
             ].map((item) => (
@@ -404,7 +404,7 @@ export default function EcoMarketApp() {
           <SmartSearch query={query} setQuery={setQuery} resultCount={visibleProducts.length} />
           <div className="grid grid-cols-3 gap-3 text-center">
             <Metric value="12+" label="Productos" />
-            <Metric value="< 8h" label="Entrega" />
+            <Metric value="< 8h" label="Entrega rápida" />
             <Metric value="IA" label="Recomendación" />
           </div>
         </div>
@@ -436,7 +436,7 @@ export default function EcoMarketApp() {
             <div className="mt-8 border border-earth-300 bg-white p-6 text-center shadow-soft">
               <h3 className="text-xl font-black">No encontramos productos con ese filtro</h3>
               <p className="mt-2 text-leaf-700">
-                Prueba con miel, cafe, saludable, limpieza, desayuno o cambia de categoria.
+                Prueba con miel, café, saludable, limpieza, desayuno o cambia de categoría.
               </p>
             </div>
           )}
@@ -451,6 +451,9 @@ export default function EcoMarketApp() {
             text="El prototipo simula recomendación personalizada, predicción de demanda, recuperación de carrito y atención automatizada."
             dark
           />
+          <p className="mt-5 inline-flex border border-earth-300/50 bg-white/10 px-4 py-2 text-sm font-bold text-earth-100 backdrop-blur">
+            Simulación académica basada en reglas, comportamiento de compra y datos del carrito.
+          </p>
           <div className="mt-8 grid gap-5 lg:grid-cols-3">
             <div className="bg-white p-5 text-leaf-900 shadow-soft">
               <h3 className="text-xl font-black">Recomendaciones inteligentes</h3>
@@ -654,9 +657,9 @@ export default function EcoMarketApp() {
       <section id="admin" className="bg-leaf-50 px-4 py-16">
         <div className="mx-auto max-w-7xl">
           <SectionHeader
-            eyebrow="Panel administrativo"
-            title="Control comercial, inventario y pedidos"
-            text="Vista simulada para explicar cómo EcoMarket gestiona ventas, stock, pedidos y analítica."
+            eyebrow="Panel administrativo simulado"
+            title="Panel Administrativo Simulado para Defensa Académica"
+            text="Permite explicar ventas, inventario, pedidos, stock bajo y analítica con datos simulados para la exposición."
           />
           <AdminPanel
             products={products}
@@ -720,7 +723,7 @@ export default function EcoMarketApp() {
             <SectionHeader
               eyebrow="Datos académicos"
               title="¿Por qué esta plataforma cumple con el proyecto?"
-              text="La solución muestra la lógica del negocio, no solo una página estética."
+              text="Esta sección resume cómo el prototipo cumple con los requerimientos académicos del Integrante 9."
             />
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {academicCards.map((card) => (
@@ -843,7 +846,7 @@ function Navbar({
             href="https://wa.me/59170000000?text=Hola%2C%20quiero%20hacer%20un%20pedido%20en%20EcoMarket%20Bolivia."
             target="_blank"
             rel="noreferrer"
-            className="hidden border border-white/30 px-3 py-2 text-sm font-bold transition hover:bg-white/10 sm:inline-flex"
+            className="hidden items-center border border-white bg-[#25D366] px-4 py-2 text-sm font-black text-leaf-900 shadow-[0_0_0_3px_rgba(255,255,255,0.18),0_10px_24px_rgba(0,0,0,0.22)] transition hover:bg-[#1ebc59] hover:shadow-[0_0_0_4px_rgba(255,255,255,0.25),0_14px_30px_rgba(0,0,0,0.28)] sm:inline-flex"
           >
             Atención inmediata
           </a>
@@ -871,7 +874,7 @@ function Navbar({
             href="https://wa.me/59170000000?text=Hola%2C%20quiero%20hacer%20un%20pedido%20en%20EcoMarket%20Bolivia."
             target="_blank"
             rel="noreferrer"
-            className="border border-white/15 bg-white/10 px-3 py-2"
+            className="border border-white bg-[#25D366] px-3 py-2 font-black text-leaf-900 shadow-[0_0_0_3px_rgba(255,255,255,0.16)]"
           >
             Atención inmediata
           </a>
@@ -928,7 +931,7 @@ function SmartSearch({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="min-w-0 flex-1 border border-earth-300 px-4 py-3 text-leaf-900 outline-none focus:focus-ring"
-          placeholder="Busca miel, cafe, saludable, quinua o eco..."
+          placeholder="Busca miel, café, saludable, quinua o eco..."
         />
         <a
           href="#productos"
@@ -938,7 +941,7 @@ function SmartSearch({
         </a>
       </div>
       <p className="mt-2 text-sm text-leaf-700">
-        {resultCount} resultado(s) encontrados con coincidencia semántica.
+        {resultCount} productos encontrados con coincidencia semántica.
       </p>
     </div>
   );
@@ -954,7 +957,7 @@ function CategoryFilter({
   onChange: (category: string) => void;
 }) {
   return (
-    <div className="mt-8 flex gap-2 overflow-x-auto pb-2">
+    <div className="mt-8 flex flex-wrap gap-2">
       {categories.map((category) => (
         <button
           key={category}
@@ -995,11 +998,7 @@ function ProductCard({
   return (
     <article className="overflow-hidden border border-earth-300 bg-white shadow-soft">
       <div className="relative h-48">
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="h-full w-full object-cover"
-        />
+        <ProductVisual product={product} className="h-full w-full" />
         <span className="absolute left-3 top-3 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-leaf-900">
           {product.badge}
         </span>
@@ -1039,6 +1038,89 @@ function ProductCard({
   );
 }
 
+function ProductVisual({
+  product,
+  className,
+  compact = false,
+}: {
+  product: Product;
+  className: string;
+  compact?: boolean;
+}) {
+  const visualKey = product.imageUrl.replace("placeholder:", "");
+  const visual = productVisuals[visualKey];
+
+  if (!product.imageUrl.startsWith("placeholder:") || !visual) {
+    return (
+      <img
+        src={product.imageUrl}
+        alt={product.name}
+        className={`${className} object-cover`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${className} relative flex items-center justify-center overflow-hidden ${visual.background}`}
+      aria-label={product.name}
+      role="img"
+    >
+      <div className="absolute inset-0 opacity-25">
+        <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,white_0,transparent_24%),radial-gradient(circle_at_80%_30%,white_0,transparent_18%),radial-gradient(circle_at_45%_85%,white_0,transparent_22%)]" />
+      </div>
+      <div className="relative p-4 text-center text-leaf-900">
+        <div className={`mx-auto flex items-center justify-center border border-white/60 bg-white/70 font-black shadow-soft ${compact ? "h-12 w-12 text-sm" : "h-20 w-20 text-2xl"}`}>
+          {visual.mark}
+        </div>
+        {!compact && (
+          <>
+            <p className="mt-3 text-sm font-black uppercase tracking-[0.14em]">
+              {visual.label}
+            </p>
+            <p className="mt-1 text-xs font-bold text-leaf-700">
+              Visual académico del producto
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const productVisuals: Record<string, { background: string; mark: string; label: string }> = {
+  quinua: {
+    background: "bg-gradient-to-br from-amber-100 via-stone-100 to-leaf-100",
+    mark: "QN",
+    label: "Quinua real",
+  },
+  granola: {
+    background: "bg-gradient-to-br from-earth-100 via-amber-100 to-orange-100",
+    mark: "GR",
+    label: "Granola artesanal",
+  },
+  "harina-quinua": {
+    background: "bg-gradient-to-br from-stone-100 via-white to-amber-100",
+    mark: "HQ",
+    label: "Harina de quinua",
+  },
+  panela: {
+    background: "bg-gradient-to-br from-amber-200 via-earth-300 to-earth-500",
+    mark: "PN",
+    label: "Panela orgánica",
+  },
+  jabon: {
+    background: "bg-gradient-to-br from-leaf-50 via-white to-teal-100",
+    mark: "JB",
+    label: "Jabón artesanal",
+  },
+  detergente: {
+    background: "bg-gradient-to-br from-teal-50 via-white to-leaf-100",
+    mark: "LG",
+    label: "Limpieza ecológica",
+  },
+};
+
 function ProductModal({
   product,
   products,
@@ -1060,11 +1142,7 @@ function ProductModal({
       <div className="mx-auto max-w-5xl bg-white shadow-soft">
         <div className="grid gap-6 p-5 md:grid-cols-[0.9fr_1.1fr] md:p-8">
           <div>
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="h-80 w-full object-cover"
-            />
+            <ProductVisual product={product} className="h-80 w-full" />
             <div className="mt-4 grid grid-cols-[auto_1fr] gap-4 border border-earth-300 bg-earth-100 p-4">
               <div className="grid h-24 w-24 grid-cols-9 border border-leaf-900 bg-white p-1">
                 {qrCells.map((cell, index) => (
@@ -1199,7 +1277,7 @@ function CartDrawer({
 
                 return (
                   <div key={line.productId} className="grid grid-cols-[72px_1fr] gap-3 border border-earth-300 p-3">
-                    <img src={product.imageUrl} alt={product.name} className="h-20 w-full object-cover" />
+                    <ProductVisual product={product} className="h-20 w-full" compact />
                     <div>
                       <h3 className="font-black">{product.name}</h3>
                       <p className="text-sm text-leaf-700">{formatBs(product.priceBs)}</p>
